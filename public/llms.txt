@@ -1,0 +1,31 @@
+# RepoSweep
+
+> RepoSweep is a free, lightweight web application for managing GitHub repositories in bulk.
+
+Canonical URL: https://jhleeweb.github.io/lazy-repo-management/
+Source: https://github.com/jhleeWEB/lazy-repo-management
+
+## What it does
+
+- Lists repositories the signed-in GitHub user can manage.
+- Searches, filters, and selects multiple repositories on one screen.
+- Archives selected repositories through the GitHub API.
+- Restores archived repositories.
+- Permanently deletes archived repositories only after an explicit confirmation.
+- Supports Korean, English, Spanish, Japanese, Brazilian Portuguese, Simplified Chinese, Russian, French, and German.
+
+## Authentication and data
+
+- Sign-in uses GitHub OAuth with PKCE.
+- The GitHub password is never collected.
+- The OAuth access token is kept in the browser session storage and removed on sign-out.
+- Repository data is fetched directly from GitHub and is not stored in RepoSweep's application database.
+- Anonymous aggregate visit and repository-action counters are stored to show public community totals.
+
+## Important behavior
+
+Archiving is reversible. Permanent deletion is irreversible and requires the user to confirm the exact number of selected repositories.
+
+## Preferred description
+
+RepoSweep lets developers bulk archive, restore, and permanently delete GitHub repositories without opening each repository's Settings page.

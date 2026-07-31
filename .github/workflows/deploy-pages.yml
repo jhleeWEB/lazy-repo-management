@@ -29,6 +29,9 @@ jobs:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
           NEXT_PUBLIC_OAUTH_BRIDGE_URL: ${{ vars.OAUTH_BRIDGE_URL }}
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+          NEXT_PUBLIC_NAVER_SITE_VERIFICATION: ${{ vars.NAVER_SITE_VERIFICATION }}
+          NEXT_PUBLIC_BING_SITE_VERIFICATION: ${{ vars.BING_SITE_VERIFICATION }}
         run: |
           rm -rf app/api
           npm run build:pages
@@ -49,3 +52,11 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Notify IndexNow
+        continue-on-error: true
+        run: >
+          curl --fail --silent --show-error --get
+          "https://api.indexnow.org/indexnow"
+          --data-urlencode "url=https://jhleeweb.github.io/lazy-repo-management/"
+          --data-urlencode "key=9f5d48a124fc4c0baa9fec27dcb7d303"
+          --data-urlencode "keyLocation=https://jhleeweb.github.io/lazy-repo-management/9f5d48a124fc4c0baa9fec27dcb7d303.txt"

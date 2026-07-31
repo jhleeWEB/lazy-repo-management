@@ -46,10 +46,9 @@ function LanguagePicker({ locale, onChange }: { locale: Locale; onChange: (local
   );
 }
 
-export default function Home() {
+export default function Home({ initialLocale = "ko" }: { initialLocale?: Locale }) {
   const store = useRepoStore();
-  const [locale, setLocale] = useState<Locale>("ko");
-  const [localeReady, setLocaleReady] = useState(false);
+  const [locale, setLocale] = useState<Locale>(initialLocale);
   const [oauthWorking, setOauthWorking] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -71,15 +70,19 @@ export default function Home() {
       window.location.replace(destination.toString());
       return;
     }
-    const nextLocale = resolveLocale(localStorage.getItem("reposweep:locale") ?? navigator.language);
+    const savedLocale = localStorage.getItem("reposweep:locale");
+    const nextLocale = savedLocale
+      ? resolveLocale(savedLocale)
+      : initialLocale === "ko"
+        ? resolveLocale(navigator.language)
+        : initialLocale;
     queueMicrotask(() => {
       setLocale(nextLocale);
-      setLocaleReady(true);
     });
     document.documentElement.lang = nextLocale;
     store.hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialLocale]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -173,7 +176,7 @@ export default function Home() {
   }
   function moveTo(view: ViewName) { store.setView(view); }
 
-  if (!localeReady || !store.hydrated || (store.token && store.demo && store.loading)) {
+  if (store.token && store.demo && store.loading) {
     return <main className="loading-screen" aria-live="polite"><LoaderCircle className="spin" size={22} /></main>;
   }
 
