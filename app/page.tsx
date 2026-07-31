@@ -17,6 +17,8 @@ const languageColors: Record<string, string> = {
   Go: "#00add8", Rust: "#dea584",
 };
 
+const publicAppUrl = "https://jhleeweb.github.io/lazy-repo-management/";
+
 function toBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
@@ -56,6 +58,10 @@ export default function Home() {
   const t = translations[locale];
 
   useEffect(() => {
+    if (window.location.hostname === "reposweep-auth.sadilfh.chatgpt.site") {
+      window.location.replace(publicAppUrl);
+      return;
+    }
     const nextLocale = resolveLocale(localStorage.getItem("reposweep:locale") ?? navigator.language);
     queueMicrotask(() => {
       setLocale(nextLocale);
