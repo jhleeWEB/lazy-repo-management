@@ -29,6 +29,20 @@ function getAllowedOrigin() {
   }
 }
 
+export function GET(request: NextRequest) {
+  const callbackUrl = process.env.OAUTH_CALLBACK_URL;
+  if (!callbackUrl) {
+    return NextResponse.json(
+      { error: "OAuth server configuration is incomplete." },
+      { status: 500 },
+    );
+  }
+
+  const destination = new URL(callbackUrl);
+  destination.search = request.nextUrl.search;
+  return NextResponse.redirect(destination);
+}
+
 export function OPTIONS(request: NextRequest) {
   const allowedOrigin = getAllowedOrigin();
   const requestOrigin = request.headers.get("origin");
@@ -58,10 +72,9 @@ export async function POST(request: NextRequest) {
   const payload = (await request.json().catch(() => null)) as {
     code?: string;
     code_verifier?: string;
-    redirect_uri?: string;
   } | null;
 
-  if (!payload?.code || !payload.code_verifier || payload.redirect_uri !== callbackUrl) {
+  if (!payload?.code || !payload.code_verifier) {
     return NextResponse.json(
       { error: "Invalid OAuth request." },
       { status: 400, headers: corsHeaders(allowedOrigin) },
@@ -79,7 +92,6 @@ export async function POST(request: NextRequest) {
       client_secret: clientSecret,
       code: payload.code,
       code_verifier: payload.code_verifier,
-      redirect_uri: callbackUrl,
     }),
   });
   const token = (await tokenResponse.json()) as TokenResponse;

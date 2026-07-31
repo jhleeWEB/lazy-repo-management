@@ -59,7 +59,10 @@ export default function Home() {
 
   useEffect(() => {
     if (window.location.hostname === "reposweep-auth.sadilfh.chatgpt.site") {
-      window.location.replace(publicAppUrl);
+      const destination = new URL(publicAppUrl);
+      destination.search = window.location.search;
+      destination.hash = window.location.hash;
+      window.location.replace(destination.toString());
       return;
     }
     const nextLocale = resolveLocale(localStorage.getItem("reposweep:locale") ?? navigator.language);
@@ -88,17 +91,16 @@ export default function Home() {
 
     const expectedState = sessionStorage.getItem("reposweep:oauth-state");
     const verifier = sessionStorage.getItem("reposweep:oauth-verifier");
-    const redirectUri = sessionStorage.getItem("reposweep:oauth-redirect");
     const bridgeUrl = process.env.NEXT_PUBLIC_OAUTH_BRIDGE_URL;
     queueMicrotask(() => setOauthWorking(true));
 
     async function finishOAuth() {
       try {
-        if (!returnedState || returnedState !== expectedState || !verifier || !redirectUri) throw new Error(activeCopy.loginError);
+        if (!returnedState || returnedState !== expectedState || !verifier) throw new Error(activeCopy.loginError);
         if (!bridgeUrl) throw new Error(activeCopy.oauthConfig);
         const response = await fetch(`${bridgeUrl.replace(/\/$/, "")}/api/oauth/github`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, code_verifier: verifier, redirect_uri: redirectUri }),
+          body: JSON.stringify({ code, code_verifier: verifier }),
         });
         const payload = (await response.json()) as { access_token?: string; error?: string };
         if (!response.ok || !payload.access_token) throw new Error(payload.error ?? activeCopy.loginError);
@@ -108,8 +110,7 @@ export default function Home() {
       } finally {
         sessionStorage.removeItem("reposweep:oauth-state");
         sessionStorage.removeItem("reposweep:oauth-verifier");
-        sessionStorage.removeItem("reposweep:oauth-redirect");
-        window.history.replaceState({}, "", redirectUri ?? window.location.pathname);
+        window.history.replaceState({}, "", window.location.pathname);
         setOauthWorking(false);
       }
     }
@@ -135,11 +136,9 @@ export default function Home() {
     const verifier = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
     const challenge = toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
     const state = toBase64Url(crypto.getRandomValues(new Uint8Array(24)));
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
     sessionStorage.setItem("reposweep:oauth-state", state);
     sessionStorage.setItem("reposweep:oauth-verifier", verifier);
-    sessionStorage.setItem("reposweep:oauth-redirect", redirectUri);
-    const params = new URLSearchParams({ client_id: clientId, code_challenge: challenge, code_challenge_method: "S256", redirect_uri: redirectUri, scope: "repo delete_repo", state });
+    const params = new URLSearchParams({ client_id: clientId, code_challenge: challenge, code_challenge_method: "S256", scope: "repo delete_repo", state });
     window.location.assign(`https://github.com/login/oauth/authorize?${params}`);
   }
 
