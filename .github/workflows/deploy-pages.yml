@@ -27,7 +27,11 @@ jobs:
       - name: Build static site
         env:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
-        run: npm run build:pages
+          NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
+          NEXT_PUBLIC_OAUTH_BRIDGE_URL: ${{ vars.OAUTH_BRIDGE_URL }}
+        run: |
+          rm -rf app/api
+          npm run build:pages
       - uses: actions/configure-pages@v5
         with:
           enablement: true

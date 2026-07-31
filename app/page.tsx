@@ -61,11 +61,23 @@ function formatSize(size: number) {
   return `${(size / 1024).toFixed(1)} MB`;
 }
 
+function toBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
 export default function Home() {
   const store = useRepoStore();
   const [connectOpen, setConnectOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [token, setToken] = useState("");
+  const [oauthWorking, setOauthWorking] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -74,6 +86,77 @@ export default function Home() {
     store.hydrate();
     // The store action is stable for the lifetime of the app.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const returnedState = params.get("state");
+    const oauthFailure = params.get("error_description") ?? params.get("error");
+
+    if (oauthFailure) {
+      queueMicrotask(() => {
+        setConnectOpen(true);
+        setOauthError(oauthFailure);
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (!code) return;
+
+    const expectedState = sessionStorage.getItem("reposweep:oauth-state");
+    const verifier = sessionStorage.getItem("reposweep:oauth-verifier");
+    const redirectUri = sessionStorage.getItem("reposweep:oauth-redirect");
+    const bridgeUrl = process.env.NEXT_PUBLIC_OAUTH_BRIDGE_URL;
+
+    queueMicrotask(() => {
+      setConnectOpen(true);
+      setOauthWorking(true);
+    });
+
+    async function finishOAuth() {
+      try {
+        if (!returnedState || returnedState !== expectedState || !verifier || !redirectUri) {
+          throw new Error("OAuth 요청 검증에 실패했습니다. 다시 로그인해 주세요.");
+        }
+        if (!bridgeUrl) {
+          throw new Error("OAuth 인증 서버가 설정되지 않았습니다.");
+        }
+
+        const response = await fetch(`${bridgeUrl.replace(/\/$/, "")}/api/oauth/github`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            code_verifier: verifier,
+            redirect_uri: redirectUri,
+          }),
+        });
+        const payload = (await response.json()) as {
+          access_token?: string;
+          error?: string;
+        };
+        if (!response.ok || !payload.access_token) {
+          throw new Error(payload.error ?? "GitHub 로그인에 실패했습니다.");
+        }
+
+        await useRepoStore.getState().connect(payload.access_token);
+        setConnectOpen(false);
+        setToast("GitHub 계정이 안전하게 연결되었습니다.");
+      } catch (error) {
+        setOauthError(
+          error instanceof Error ? error.message : "GitHub 로그인에 실패했습니다.",
+        );
+      } finally {
+        sessionStorage.removeItem("reposweep:oauth-state");
+        sessionStorage.removeItem("reposweep:oauth-verifier");
+        sessionStorage.removeItem("reposweep:oauth-redirect");
+        window.history.replaceState({}, "", redirectUri ?? window.location.pathname);
+        setOauthWorking(false);
+      }
+    }
+
+    void finishOAuth();
   }, []);
 
   useEffect(() => {
@@ -102,16 +185,37 @@ export default function Home() {
     visibleRepos.length > 0 &&
     visibleRepos.every((repo) => store.selected.includes(repo.full_name));
 
-  async function handleConnect(event: React.FormEvent) {
-    event.preventDefault();
-    try {
-      await store.connect(token.trim());
-      setToken("");
-      setConnectOpen(false);
-      setToast("GitHub 계정이 연결되었습니다.");
-    } catch {
-      // The store exposes the actionable error in the modal.
+  async function handleConnect() {
+    setOauthError(null);
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      setOauthError("OAuth Client ID가 설정되지 않았습니다.");
+      return;
     }
+
+    const random = crypto.getRandomValues(new Uint8Array(32));
+    const verifier = toBase64Url(random);
+    const challenge = toBase64Url(
+      new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+      ),
+    );
+    const state = toBase64Url(crypto.getRandomValues(new Uint8Array(24)));
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+
+    sessionStorage.setItem("reposweep:oauth-state", state);
+    sessionStorage.setItem("reposweep:oauth-verifier", verifier);
+    sessionStorage.setItem("reposweep:oauth-redirect", redirectUri);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      redirect_uri: redirectUri,
+      scope: "repo delete_repo",
+      state,
+    });
+    window.location.assign(`https://github.com/login/oauth/authorize?${params}`);
   }
 
   async function handleArchive() {
@@ -531,53 +635,43 @@ export default function Home() {
             </span>
             <h2 id="connect-title">내 GitHub 연결하기</h2>
             <p className="modal-copy">
-              Fine-grained personal access token으로 안전하게 연결합니다.
-              토큰은 이 탭을 닫으면 사라져요.
+              GitHub 공식 인증 화면에서 로그인합니다. 비밀번호나 개인 토큰을
+              RepoSweep에 직접 입력하지 않아요.
             </p>
             <div className="permission-card">
               <span>
                 <KeyRound size={18} />
               </span>
               <div>
-                <strong>필요한 저장소 권한</strong>
+                <strong>요청하는 GitHub 권한</strong>
                 <p>
-                  Repository access: 선택한 저장소 · Administration: Read and
-                  write
+                  저장소 관리(repo) · 관리자 저장소 삭제(delete_repo)
                 </p>
               </div>
             </div>
-            <form onSubmit={handleConnect}>
-              <label htmlFor="github-token">Personal access token</label>
-              <input
-                id="github-token"
-                type="password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                placeholder="github_pat_..."
-                autoComplete="off"
-                required
-              />
-              {store.error && <p className="form-error">{store.error}</p>}
-              <button
-                className="primary-submit"
-                type="submit"
-                disabled={store.loading || !token.trim()}
-              >
-                {store.loading ? (
-                  <LoaderCircle className="spin" size={17} />
-                ) : (
-                  <GitBranch size={17} />
-                )}
-                연결하고 저장소 불러오기
-              </button>
-            </form>
+            <button
+              className="primary-submit"
+              type="button"
+              onClick={handleConnect}
+              disabled={oauthWorking || store.loading}
+            >
+              {oauthWorking || store.loading ? (
+                <LoaderCircle className="spin" size={17} />
+              ) : (
+                <GitBranch size={17} />
+              )}
+              {oauthWorking ? "GitHub 인증 확인 중" : "GitHub로 계속하기"}
+            </button>
+            {(oauthError || store.error) && (
+              <p className="form-error">{oauthError ?? store.error}</p>
+            )}
             <a
               className="token-link"
-              href="https://github.com/settings/personal-access-tokens/new"
+              href="https://docs.github.com/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps"
               target="_blank"
               rel="noreferrer"
             >
-              GitHub에서 토큰 만들기 <ArrowUpRight size={15} />
+              요청 권한 자세히 보기 <ArrowUpRight size={15} />
             </a>
           </section>
         </div>
