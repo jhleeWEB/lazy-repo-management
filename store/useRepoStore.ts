@@ -39,6 +39,7 @@ type RepoState = {
   error: string | null;
   stats: UsageStats;
   hydrate: () => void;
+  refreshStats: () => Promise<void>;
   connect: (token: string) => Promise<void>;
   disconnect: () => void;
   refresh: () => Promise<void>;
@@ -143,19 +144,39 @@ const defaultStats: UsageStats = {
   deleted: 0,
 };
 
-function readStats(): UsageStats {
-  try {
-    return {
-      ...defaultStats,
-      ...JSON.parse(localStorage.getItem("reposweep:stats") ?? "{}"),
-    };
-  } catch {
-    return defaultStats;
+function trackRepositoryEvents(eventName: string, count: number) {
+  const tracker = (window as Window & {
+    umami?: { track: (name: string) => void };
+  }).umami;
+  for (let index = 0; index < count; index += 1) {
+    tracker?.track(eventName);
   }
 }
 
-function saveStats(stats: UsageStats) {
-  localStorage.setItem("reposweep:stats", JSON.stringify(stats));
+async function fetchGlobalStats() {
+  const bridgeUrl = process.env.NEXT_PUBLIC_OAUTH_BRIDGE_URL;
+  if (!bridgeUrl) return null;
+  const response = await fetch(`${bridgeUrl.replace(/\/$/, "")}/api/stats`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as UsageStats;
+}
+
+async function incrementGlobalStat(
+  metric: keyof UsageStats,
+  count: number,
+  visitorId?: string,
+) {
+  if (count < 1) return;
+  const bridgeUrl = process.env.NEXT_PUBLIC_OAUTH_BRIDGE_URL;
+  if (!bridgeUrl) return;
+  const response = await fetch(`${bridgeUrl.replace(/\/$/, "")}/api/stats`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ metric, count, visitorId }),
+  });
+  if (!response.ok) throw new Error("Global stats update failed.");
 }
 
 async function runOperation(
@@ -191,14 +212,24 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   hydrate: () => {
     if (get().hydrated) return;
     const token = sessionStorage.getItem("reposweep:token");
-    const stats = readStats();
-    if (!sessionStorage.getItem("reposweep:visited")) {
-      stats.visits += 1;
-      sessionStorage.setItem("reposweep:visited", "true");
-      saveStats(stats);
-    }
-    set({ token, stats, hydrated: true });
+    set({ token, hydrated: true });
+    void get().refreshStats();
     if (token) void get().refresh();
+  },
+
+  refreshStats: async () => {
+    try {
+      let visitorId = localStorage.getItem("reposweep:visitor-id");
+      if (!visitorId) {
+        visitorId = crypto.randomUUID();
+        localStorage.setItem("reposweep:visitor-id", visitorId);
+      }
+      await incrementGlobalStat("visits", 1, visitorId);
+      const stats = await fetchGlobalStats();
+      if (stats) set({ stats });
+    } catch {
+      // Public totals are optional; repository management must keep working.
+    }
   },
 
   connect: async (token) => {
@@ -280,18 +311,18 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       : await runOperation(selected, (name) =>
           setRepositoryArchived(name, true, token!),
         );
-    const stats = {
-      ...get().stats,
-      archived: get().stats.archived + result.succeeded.length,
-    };
-    saveStats(stats);
+    trackRepositoryEvents("repo_archived", result.succeeded.length);
+    void incrementGlobalStat("archived", result.succeeded.length).catch(() => undefined);
     set((state) => ({
       repos: state.repos.map((repo) =>
         result.succeeded.includes(repo.full_name)
           ? { ...repo, archived: true }
           : repo,
       ),
-      stats,
+      stats: {
+        ...state.stats,
+        archived: state.stats.archived + result.succeeded.length,
+      },
       selected: [],
       loading: false,
       error: result.failed.length
@@ -309,18 +340,18 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       : await runOperation(selected, (name) =>
           setRepositoryArchived(name, false, token!),
         );
-    const stats = {
-      ...get().stats,
-      restored: get().stats.restored + result.succeeded.length,
-    };
-    saveStats(stats);
+    trackRepositoryEvents("repo_restored", result.succeeded.length);
+    void incrementGlobalStat("restored", result.succeeded.length).catch(() => undefined);
     set((state) => ({
       repos: state.repos.map((repo) =>
         result.succeeded.includes(repo.full_name)
           ? { ...repo, archived: false }
           : repo,
       ),
-      stats,
+      stats: {
+        ...state.stats,
+        restored: state.stats.restored + result.succeeded.length,
+      },
       selected: [],
       loading: false,
       error: result.failed.length
@@ -336,16 +367,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const result = demo
       ? { succeeded: selected, failed: [] }
       : await runOperation(selected, (name) => deleteRepository(name, token!));
-    const stats = {
-      ...get().stats,
-      deleted: get().stats.deleted + result.succeeded.length,
-    };
-    saveStats(stats);
+    trackRepositoryEvents("repo_deleted", result.succeeded.length);
+    void incrementGlobalStat("deleted", result.succeeded.length).catch(() => undefined);
     set((state) => ({
       repos: state.repos.filter(
         (repo) => !result.succeeded.includes(repo.full_name),
       ),
-      stats,
+      stats: {
+        ...state.stats,
+        deleted: state.stats.deleted + result.succeeded.length,
+      },
       selected: [],
       loading: false,
       error: result.failed.length

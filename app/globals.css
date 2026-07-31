@@ -27,6 +27,10 @@ input[type="checkbox"] { accent-color:var(--ink); height:16px; width:16px; }
 .github-login:hover { background:var(--acid); color:var(--ink); }
 .permission-note { align-items:flex-start; color:var(--muted); display:flex; font-size:10px; gap:7px; line-height:1.5; margin:16px 0 0; }
 .permission-note svg { flex:0 0 auto; margin-top:1px; }
+.community-stats { border-top:1px solid var(--line); display:grid; gap:12px; grid-template-columns:repeat(4,1fr); margin-top:20px; padding-top:15px; }
+.community-stats span { min-width:0; }
+.community-stats small { color:var(--muted); display:block; font-size:8px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.community-stats strong { display:block; font-size:22px; letter-spacing:-.06em; margin-top:4px; }
 .error-message,.page-error { color:#c7322b; font-size:11px; font-weight:750; }
 .login-stamp { bottom:24px; color:#8c8a80; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; letter-spacing:.15em; position:absolute; }
 

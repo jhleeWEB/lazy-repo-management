@@ -56,6 +56,12 @@ export default function Home() {
   const [confirmText, setConfirmText] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const t = translations[locale];
+  const globalStats = [
+    [t.statsVisits, store.stats.visits],
+    [t.statsArchived, store.stats.archived],
+    [t.statsRestored, store.stats.restored],
+    [t.statsDeleted, store.stats.deleted],
+  ] as const;
 
   useEffect(() => {
     if (window.location.hostname === "reposweep-auth.sadilfh.chatgpt.site") {
@@ -186,6 +192,11 @@ export default function Home() {
           </button>
           {oauthError && <p className="error-message">{oauthError}</p>}
           <p className="permission-note"><LockKeyhole size={14} />{t.loginPermissions}</p>
+          <div className="community-stats" aria-label={t.stats}>
+            {globalStats.map(([label, value]) => (
+              <span key={label}><small>{label}</small><strong>{value.toLocaleString(locale)}</strong></span>
+            ))}
+          </div>
         </section>
         <p className="login-stamp">NO DB · NO PASSWORD · LESS CLICKING</p>
       </main>
@@ -219,8 +230,8 @@ export default function Home() {
 
         {store.view === "activity" ? (
           <section className="stats-panel">
-            {[[t.statsVisits, store.stats.visits], [t.statsArchived, store.stats.archived], [t.statsRestored, store.stats.restored], [t.statsDeleted, store.stats.deleted]].map(([label, value], index) => (
-              <article key={String(label)} data-index={index}><span>{label}</span><strong>{value}</strong></article>
+            {globalStats.map(([label, value], index) => (
+              <article key={String(label)} data-index={index}><span>{label}</span><strong>{value.toLocaleString(locale)}</strong></article>
             ))}
             <p>{t.statsLocal}</p>
           </section>
