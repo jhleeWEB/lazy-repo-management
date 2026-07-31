@@ -24,5 +24,16 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body>{children}</body></html>;
+  return (
+    <html lang="ko">
+      <head>
+        <script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="16cf2a0a-48f2-4aef-974d-7d95448a3169"
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
 }
