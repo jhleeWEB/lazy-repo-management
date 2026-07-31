@@ -3,7 +3,7 @@ import { languageAlternates, seoCopy, SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
 const googleVerification =
-  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ??
+  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
   "-wz1RWutyHz5hjvfp9ntFex4F2EhNLO0cCZ1xKHVvMA";
 const naverVerification = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION;
 const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION;
