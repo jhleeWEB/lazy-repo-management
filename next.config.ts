@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
   output: isPagesBuild ? "export" : undefined,
   basePath,
   assetPrefix: basePath,
-  images: { unoptimized: true },
+  images: {
+    unoptimized: true,
+    remotePatterns: [{ protocol: "https", hostname: "avatars.githubusercontent.com" }],
+  },
   trailingSlash: true,
   env: {
     NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID:
