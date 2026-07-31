@@ -6,7 +6,9 @@ const googleVerification =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
   "-wz1RWutyHz5hjvfp9ntFex4F2EhNLO0cCZ1xKHVvMA";
 const naverVerification = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION;
-const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION;
+const bingVerification =
+  process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION ||
+  "0260EED594544522F26A1D88E0BCE677";
 
 const verificationOther = {
   ...(naverVerification ? { "naver-site-verification": naverVerification } : {}),
